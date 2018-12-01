@@ -1,0 +1,279 @@
+#!/usr/bin/env ruby
+
+require "fileutils"
+require "json"
+require "yaml"
+
+# This exists so that we can stub out various calls to system commands (e.g.
+# copying files, running Git operations) which would otherwise be difficult or
+# fragile to test.
+class SystemUtils
+  def abort(message)
+    Kernel.abort(message)
+  end
+
+  def clean_git_repository?(dir)
+    changes = `git -C #{dir} status -uno --porcelain`.strip
+    changes.empty?
+  end
+
+  def copy_file(source, target)
+    FileUtils.copy(source, target)
+  end
+
+  def dir_exists?(dir)
+    Dir.exists?(dir)
+  end
+
+  def dir_glob(pattern)
+    Dir.glob(pattern)
+  end
+
+  def git_add(files)
+    `git add #{files.join(" ")}`
+  end
+
+  def git_any_files_staged?
+    files = `git diff --name-only --cached`
+    !files.empty?
+  end
+
+  def git_commit(message)
+    execute_subshell(%{git commit -vem "#{message}"})
+  end
+
+  def git_current_branch(dir)
+    `cd #{dir} && git rev-parse --abbrev-ref HEAD`.strip
+  end
+
+  def git_pull_origin_master
+    `git pull origin master`
+  end
+
+  def git_push_origin_master
+    `git push origin master`
+  end
+
+  def write_file(file, data)
+    File.write(file, data)
+  end
+
+  private def execute_subshell(*args)
+    ret = system(*args)
+    if ret.nil? || !ret
+      abort("Failed to execute subshell (status #{$?}): #{args}")
+    end
+  end
+end
+
+# Encapsulates our scripted update logic so that we can test it.
+class Updater
+  SOURCE_DIR = File.expand_path("~/nexter/pay-server/")
+  TARGET_DIR = File.expand_path("../../", __FILE__)
+
+  def initialize(dry_run: false, out: nil, utils: nil)
+    self.dry_run = dry_run
+    self.out = out || $stdout
+    self.utils = utils || SystemUtils.new
+  end
+
+  def run
+    unless utils.dir_exists?(SOURCE_DIR)
+      utils.abort("Source directory does not exist: #{SOURCE_DIR}")
+      return # reachable in testing
+    end
+
+    unless utils.git_current_branch(SOURCE_DIR) == "master"
+      utils.abort("Source repository should be on master branch: #{SOURCE_DIR}")
+      return # reachable in testing
+    end
+
+    unless utils.clean_git_repository?(TARGET_DIR)
+      utils.abort("Repository must be unmodified to continue: #{TARGET_DIR}")
+      return # reachable in testing
+    end
+
+    out.puts "--> Pulling from origin"
+    out.puts utils.git_pull_origin_master
+
+    ["fixtures2", "fixtures3", "spec2", "spec3"].each do |file|
+      source = File.join(SOURCE_DIR, "openapi", file + ".yaml")
+      target = File.join(TARGET_DIR, "openapi", file + ".yaml")
+
+      out.puts "--> Copying #{source} to #{target}"
+      out.puts utils.copy_file(source, target)
+
+      out.puts "--> Rewriting #{source} as JSON"
+      utils.write_file(File.join(TARGET_DIR, "openapi", file + ".json"),
+        JSON.pretty_generate(YAML.load(File.read(target))))
+    end
+
+    if utils.clean_git_repository?(TARGET_DIR)
+      utils.abort("No changes to commit (fixtures and spec unchanged)")
+      return # reachable in testing
+    end
+
+    out.puts "--> Commiting fixtures"
+    out.puts utils.git_add(utils.dir_glob("#{TARGET_DIR}/openapi/fixtures*"))
+    if utils.git_any_files_staged?
+      out.puts utils.git_commit("Update fixture data")
+    else
+      out.puts "--> No fixture changes to commit"
+    end
+
+    out.puts "--> Commiting specification"
+    out.puts utils.git_add(utils.dir_glob("#{TARGET_DIR}/openapi/spec*"))
+    if utils.git_any_files_staged?
+      out.puts utils.git_commit("Update OpenAPI specification")
+    else
+      out.puts "--> No OpenAPI specification changes to commit"
+    end
+
+    if dry_run
+      out.puts "--> Not pushing to origin because DRY_RUN=true"
+    else
+      out.puts "--> Pushing to origin"
+      out.puts utils.git_push_origin_master
+    end
+  end
+
+  private
+
+  attr_accessor :dry_run
+  attr_accessor :out
+  attr_accessor :utils
+end
+
+if ENV['RUN_TESTS'] != 'true'
+  dry_run = (ENV['DRY_RUN'] == 'true')
+  Updater.new(dry_run: dry_run).run
+else
+  require "minitest/autorun"
+  require "minitest/mock"
+
+  class UpdateTest < Minitest::Test
+    def setup
+      self.utils = Minitest::Mock.new
+      self.updater = Updater.new(out: StringIO.new, utils: utils)
+    end
+
+    def test_runs_successfully
+      utils.expect(:dir_exists?, true,
+        [Updater::SOURCE_DIR])
+      utils.expect(:git_current_branch, "master",
+        [Updater::SOURCE_DIR])
+      utils.expect(:clean_git_repository?, true,
+        [Updater::TARGET_DIR])
+
+      utils.expect(:git_pull_origin_master, "")
+
+      ["fixtures2", "fixtures3", "spec2", "spec3"].each do |file|
+        source = File.join(Updater::SOURCE_DIR, "openapi", file + ".yaml")
+        target = File.join(Updater::TARGET_DIR, "openapi", file + ".yaml")
+
+        utils.expect(:copy_file, "", [source, target])
+
+        json_data = JSON.pretty_generate(YAML.load(File.read(target)))
+        json_target = File.join(Updater::TARGET_DIR, "openapi", file + ".json")
+
+        utils.expect(:write_file, "", [json_target, json_data])
+      end
+
+      utils.expect(:clean_git_repository?, false,
+        [Updater::TARGET_DIR])
+
+      utils.expect(:dir_glob,
+        ["fixtures2.json", "fixtures2.yaml", "fixtures3.json", "fixtures3.yaml"],
+        ["#{Updater::TARGET_DIR}/openapi/fixtures*"])
+      utils.expect(:git_add, "",
+        [["fixtures2.json", "fixtures2.yaml", "fixtures3.json", "fixtures3.yaml"]])
+      utils.expect(:git_any_files_staged?, true)
+      utils.expect(:git_commit, "",
+        ["Update fixture data"])
+
+      utils.expect(:dir_glob,
+        ["spec2.json", "spec2.yaml", "spec3.json", "spec3.yaml"],
+        ["#{Updater::TARGET_DIR}/openapi/spec*"])
+      utils.expect(:git_add, "",
+        [["spec2.json", "spec2.yaml", "spec3.json", "spec3.yaml"]])
+      utils.expect(:git_any_files_staged?, true)
+      utils.expect(:git_commit, "",
+        ["Update OpenAPI specification"])
+
+      utils.expect(:git_push_origin_master, "")
+
+      updater.run
+      utils.verify
+    end
+
+    def test_checks_source_and_aborts
+      utils.expect(:dir_exists?, false,
+        [Updater::SOURCE_DIR])
+      utils.expect(:abort, nil,
+        ["Source directory does not exist: #{Updater::SOURCE_DIR}"])
+      updater.run
+      utils.verify
+    end
+
+    def test_checks_source_on_master_and_aborts
+      utils.expect(:dir_exists?, true,
+        [Updater::SOURCE_DIR])
+      utils.expect(:git_current_branch, "my-feature-branch",
+        [Updater::SOURCE_DIR])
+      utils.expect(:abort, nil,
+        ["Source repository should be on master branch: #{Updater::SOURCE_DIR}"])
+      updater.run
+      utils.verify
+    end
+
+    def test_checks_target_unmodified_and_aborts
+      utils.expect(:dir_exists?, true,
+        [Updater::SOURCE_DIR])
+      utils.expect(:git_current_branch, "master",
+        [Updater::SOURCE_DIR])
+      utils.expect(:clean_git_repository?, false,
+        [Updater::TARGET_DIR])
+      utils.expect(:abort, nil,
+        ["Repository must be unmodified to continue: #{Updater::TARGET_DIR}"])
+      updater.run
+      utils.verify
+    end
+
+    def test_checks_target_modified_after_copy_and_aborts
+      utils.expect(:dir_exists?, true,
+        [Updater::SOURCE_DIR])
+      utils.expect(:git_current_branch, "master",
+        [Updater::SOURCE_DIR])
+      utils.expect(:clean_git_repository?, true,
+        [Updater::TARGET_DIR])
+
+      utils.expect(:git_pull_origin_master, "")
+
+      ["fixtures2", "fixtures3", "spec2", "spec3"].each do |file|
+        source = File.join(Updater::SOURCE_DIR, "openapi", file + ".yaml")
+        target = File.join(Updater::TARGET_DIR, "openapi", file + ".yaml")
+
+        utils.expect(:copy_file, "", [source, target])
+
+        json_data = JSON.pretty_generate(YAML.load(File.read(target)))
+        json_target = File.join(Updater::TARGET_DIR, "openapi", file + ".json")
+
+        utils.expect(:write_file, "", [json_target, json_data])
+      end
+
+      utils.expect(:clean_git_repository?, true,
+        [Updater::TARGET_DIR])
+
+      utils.expect(:abort, nil,
+        ["No changes to commit (fixtures and spec unchanged)"])
+
+      updater.run
+      utils.verify
+    end
+
+    private
+
+    attr_accessor :updater
+    attr_accessor :utils
+  end
+end

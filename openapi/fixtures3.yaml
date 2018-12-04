@@ -13,7 +13,7 @@ resources:
     default_currency: usd
     details_submitted: false
     display_name: 
-    email: site@nexter.com
+    email: info@nexter.io
     external_accounts:
       data: []
       has_more: false
@@ -164,7 +164,7 @@ resources:
   bank_account:
     account_holder_name: Jane Austen
     account_holder_type: individual
-    bank_name: STRIPE TEST BANK
+    bank_name: NEXTER TEST BANK
     country: US
     currency: usd
     customer: 
@@ -792,7 +792,7 @@ resources:
         livemode: false
         metadata: {}
         object: file_link
-        url: https://justintrudell-upload-mydev.dev.nexter.me/links/fl_test_xUbePI7I4aaOzbBviEWtSuNK
+        url: https://justintrudell-upload-mydev.dev.nexter.io/links/fl_test_xUbePI7I4aaOzbBviEWtSuNK
       has_more: false
       object: list
       url: "/v1/file_links?file=file_1DbAJMIPKOzrZA5vrWWdQEVz"
@@ -801,7 +801,7 @@ resources:
     size: 9863
     title: 
     type: png
-    url: https://justintrudell-upload-mydev.dev.nexter.me/v1/files/file_1DbAJMIPKOzrZA5vrWWdQEVz/contents
+    url: https://justintrudell-upload-mydev.dev.nexter.io/v1/files/file_1DbAJMIPKOzrZA5vrWWdQEVz/contents
   file_link:
     created: 1234567890
     expired: false
@@ -811,7 +811,7 @@ resources:
     livemode: false
     metadata: {}
     object: file_link
-    url: https://justintrudell-upload-mydev.dev.nexter.me/links/fl_test_IIIHS9kD4MEiEhkjpwi6MfHk
+    url: https://justintrudell-upload-mydev.dev.nexter.io/links/fl_test_IIIHS9kD4MEiEhkjpwi6MfHk
   invoice:
     amount_due: 0
     amount_paid: 0
@@ -1185,7 +1185,7 @@ resources:
   login_link:
     created: 1234567890
     object: login_link
-    url: https://justintrudell-manage-mydev.dev.nexter.me/express/9ywGxhGbt7Fe
+    url: https://justintrudell-manage-mydev.dev.nexter.io/express/9ywGxhGbt7Fe
   logout: {}
   order:
     amount: 1500
@@ -1310,7 +1310,7 @@ resources:
     balance_transaction: txn_1DbAJRIPKOzrZA5ve46Y3yyX
     created: 1234567890
     currency: usd
-    description: STRIPE PAYOUT
+    description: NEXTER PAYOUT
     destination: ba_1DbAJSIPKOzrZA5vjPVavjdh
     failure_balance_transaction: 
     failure_code: 
@@ -1477,7 +1477,7 @@ resources:
       size: 16890
       title: 
       type: csv
-      url: https://justintrudell-upload-mydev.dev.nexter.me/v1/files/file_1DbAJMIPKOzrZA5vBvlTMOGd/contents
+      url: https://justintrudell-upload-mydev.dev.nexter.io/v1/files/file_1DbAJMIPKOzrZA5vBvlTMOGd/contents
     status: succeeded
     succeeded_at: 1234567890
   reporting.report_type:
@@ -1514,7 +1514,7 @@ resources:
       size: 500
       title: 
       type: csv
-      url: https://justintrudell-upload-mydev.dev.nexter.me/v1/files/file_1DbAJMIPKOzrZA5v8E8yAKEw/contents
+      url: https://justintrudell-upload-mydev.dev.nexter.io/v1/files/file_1DbAJMIPKOzrZA5v8E8yAKEw/contents
     id: sqr_1DbAJTIPKOzrZA5vGm0GL6bi
     livemode: false
     object: scheduled_query_run
@@ -1800,7 +1800,7 @@ resources:
     id: tdsrc_1DbAJSIPKOzrZA5vkuGeYOY3
     livemode: false
     object: three_d_secure
-    redirect_url: https://justintrudell-marlin-mydev.dev.nexter.me/3d_secure/authenticate/tdsrc_1DbAJSIPKOzrZA5vkuGeYOY3
+    redirect_url: https://justintrudell-marlin-mydev.dev.nexter.io/3d_secure/authenticate/tdsrc_1DbAJSIPKOzrZA5vkuGeYOY3
     status: redirect_pending
   token:
     card:
@@ -1849,7 +1849,7 @@ resources:
     object: topup
     source:
       ach_debit:
-        bank_name: STRIPE TEST BANK
+        bank_name: NEXTER TEST BANK
         country: US
         fingerprint: 5Wh4KBcfDrz5IOnx
         last4: '6789'
